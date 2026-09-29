@@ -32,3 +32,4 @@ _minted*/
 
 # macOS
 .DS_Store
+venv
