@@ -70,8 +70,6 @@ Task starts here now:
 '''
 
 # MPI things:
-
-
 comm = MPI.COMM_WORLD
 # Get rank in the `comm` communicator.
 rank = comm.Get_rank()
@@ -98,12 +96,27 @@ split_x = rows[chunk_id % total_rank == rank]
 # round robin thing
 
 
-'''
-Running over the splittet x axis
-'''
 
 '''
-Static scheduler
+First part of non Blocking: allocating buffer for each rank in rank 0
+'''
+if rank == 0:
+    bufs = [np.empty_like(image) for _ in range(1, total_rank)]  
+        # n buffer that are empty for each rank
+    reqs = []
+    for r in range(1, total_rank):
+        reqs.append(comm.Irecv(bufs[r - 1], source=r, tag=r))
+        # open the connection so the process can send their results
+
+
+
+
+
+
+
+
+'''
+Real Computing
 '''
 t0 = MPI.Wtime()
 
@@ -122,7 +135,8 @@ for x in split_x:
 
 
 t1 = MPI.Wtime()
-print(f"Rank {rank}: {t1 - t0:.2f} s for Rows {split_x[0]}–{split_x[-1]}", flush=True)
+# print(f"Rank {rank}: {t1 - t0:.2f} s for Rows {split_x[0]}–{split_x[-1]}", flush=True)
+print(f"Rank {rank}: {t1 - t0:.2f} s for {len(split_x)} rows", flush=True)
 
 
 
@@ -134,14 +148,36 @@ print(f"Rank {rank}: {t1 - t0:.2f} s for Rows {split_x[0]}–{split_x[-1]}", flu
 '''
 Blocking sending and recieving
 '''
+# if rank != 0:
+#     comm.Send(image, dest=0, tag=rank)
+
+# else:
+#     buf = np.empty_like(image)
+#     for x in range(1, total_rank):
+#         comm.Recv(buf, source=x, tag=x)
+#         image += buf
+
+
+'''
+Second part of non-blocking: Sending and Collecting buffers
+'''
 if rank != 0:
-    comm.Send(image, dest=0, tag=rank)
+    req = comm.Isend(image, dest=0, tag=rank)
+    req.Wait()
 
 else:
-    buf = np.empty_like(image)
-    for x in range(1, total_rank):
-        comm.Recv(buf, source=x, tag=x)
-        image += buf
+    MPI.Request.Waitall(reqs)
+    for b in bufs:
+            image += b
+
+
+
+
+
+
+
+
+
 
 
 if rank == 0:
