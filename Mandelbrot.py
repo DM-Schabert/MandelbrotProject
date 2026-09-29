@@ -84,9 +84,7 @@ total_rank = comm.Get_size()
 x_dim, y_dim = np.shape(image)
 
 # split the array to the ranks: [[1,2,3,4,5][6,7,8,9,10]]
-splittet_x = np.array_split(np.arange(x_dim), total_rank)[rank]
-
-
+split_x = np.array_split(np.arange(x_dim), total_rank)[rank]
 
 
 
@@ -97,9 +95,10 @@ Running over the splittet x axis
 '''
 Static scheduler
 '''
-for x in range(size[splittet_x]):
-# now only over your part of the x and with communication
+t0 = MPI.Wtime()
 
+for x in split_x:
+# now only over your part of the x and with communication
     cx = complex(xlim[0] + x * xconst, 0)
     for y in range(size[1]):
         # process (x, y)
@@ -112,42 +111,40 @@ for x in range(size[splittet_x]):
                 break
 
 
+t1 = MPI.Wtime()
+print(f"Rank {rank}: {t1 - t0:.2f} s for Rows {split_x[0]}–{split_x[-1]}", flush=True)
 
 
 
-start = splittet_x[0]
-end = splittet_x[- 1] + 1
+# start = split_x[0]
+# end = split_x[- 1] + 1
 
 
 
 '''
 Blocking sending and recieving
 '''
-# if rank != 0:
-#     comm.Send(image[start:end], dest=0, tag=rank)
+if rank != 0:
+    comm.Send(image, dest=0, tag=rank)
 
-# else:
-#     for x in range(1, total_rank):
-#         image = np.array(size)
-#         werte = comm.Recv(image, rank, root=x)
-    
-
-
+else:
+    buf = np.empty_like(image)
+    for x in range(1, total_rank):
+        comm.Recv(buf, source=x, tag=x)
+        image += buf
 
 
+if rank == 0:
+    import matplotlib.pyplot as plt
+    # Increase font-size
+    plt.rcParams.update({
+        "font.size": 10,
+    })
+    plt.imshow(image.T, extent=np.concatenate([xlim, ylim]))
+    plt.xlabel(r"x / Re(p_0)")
+    plt.ylabel(r"y / Im(p_0)")
 
-
-
-import matplotlib.pyplot as plt
-# Increase font-size
-plt.rcParams.update({
-    "font.size": 10,
-})
-plt.imshow(image.T, extent=np.concatenate([xlim, ylim]))
-plt.xlabel(r"x / Re(p_0)")
-plt.ylabel(r"y / Im(p_0)")
-
-# Just minimize white-space around the actual plot...
-plt.margins(0, 0)
-plt.savefig("Figure_1.png", bbox_inches="tight", pad_inches=0)
-plt.show()
+    # Just minimize white-space around the actual plot...
+    plt.margins(0, 0)
+    plt.savefig("Figure_1.png", bbox_inches="tight", pad_inches=0)
+    plt.show()
