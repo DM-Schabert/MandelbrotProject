@@ -93,6 +93,10 @@ splittet_x = np.array_split(np.arange(x_dim), total_rank)[rank]
 '''
 Running over the splittet x axis
 '''
+
+'''
+Static scheduler
+'''
 for x in range(size[splittet_x]):
 # now only over your part of the x and with communication
 
@@ -111,15 +115,19 @@ for x in range(size[splittet_x]):
 
 
 
-# start = splittet_x[0]
-# end = splittet_x[- 1] + 1
+start = splittet_x[0]
+end = splittet_x[- 1] + 1
 
+
+
+'''
+Blocking sending and recieving
+'''
 # if rank != 0:
 #     comm.Send(image[start:end], dest=0, tag=rank)
 
 # else:
 #     for x in range(1, total_rank):
-#         # hier muss wiedr etwas allokiert werden ein buffer damit man da rein schreiben kann
 #         image = np.array(size)
 #         werte = comm.Recv(image, rank, root=x)
     
