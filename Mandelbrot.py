@@ -5,7 +5,7 @@ from mpi4py.util.dtlib import from_numpy_dtype
 
 
 _help = f"""\
-{sys.argv[0]} [chunk-size] [size widthXheight] [limits xmin:xmax ymin:ymax]
+{sys.argv[0]} [chunk-size] [size widthXheight] [limits xmin:xmax ymin:ymax] [schedule block|chunk] [comm blocking|nonblocking]
 
 Here are some examples:
 
@@ -31,6 +31,9 @@ chunk_size = 10
 size = 1000, 1000
 xlim = -2.2, 0.75
 ylim = -1.3, 1.3
+schedule = "chunk"
+comm_mode = "nonblocking"
+
 
 # Now grab the arguments
 argv = sys.argv[1:]
@@ -42,6 +45,14 @@ if argv:
     xlim = tuple(map(float, argv.pop(0).split(":")))
 if argv:
     ylim = tuple(map(float, argv.pop(0).split(":")))
+if argv:
+    schedule = argv.pop(0) 
+if argv:
+    comm_mode = argv.pop(0) 
+
+if comm_mode not in ("blocking", "nonblocking"):
+    sys.exit(f"Unknown comm mode '{comm_mode}', use 'blocking' or 'nonblocking'")
+
 
 print(f"""\
 Calculating the Mandelbrot set with these arguments:
@@ -50,6 +61,8 @@ Calculating the Mandelbrot set with these arguments:
 {size = }
 {xlim = }
 {ylim = }
+{schedule = }
+{comm_mode = }
 """)
 
 # Convert to numpy arrays, not really needed...
@@ -81,39 +94,47 @@ total_rank = comm.Get_size()
 '''
 First Intuition of dividing the work
 '''
-# # get shape of imaage
-# x_dim, y_dim = np.shape(image)
-# # split the array to the ranks: [[1,2,3,4,5][6,7,8,9,10]]
-# split_x = np.array_split(np.arange(x_dim), total_rank)[rank]
+def block_scheduling_static(x_dim, rank, total_rank):
+    # split the array to the ranks: [[1,2,3,4,5][6,7,8,9,10]]
+    split_x = np.array_split(np.arange(x_dim), total_rank)[rank]
+    return split_x
 
 '''
 How the pdf says we should do it (way faster because computation heavy rows are in the middle of image)
 '''
+def chunk_scheduling_static(x_dim, chunk_size, rank, total_rank):
+    rows = np.arange(x_dim)                          
+    chunk_id = rows // chunk_size                    
+    split_x = rows[chunk_id % total_rank == rank]
+    # round robin thing
+    return split_x
+
+
+
 x_dim, y_dim = np.shape(image)
-rows = np.arange(x_dim)                          
-chunk_id = rows // chunk_size                    
-split_x = rows[chunk_id % total_rank == rank]
-# round robin thing
+if schedule == "block":
+    split_x = block_scheduling_static(x_dim, rank, total_rank)
+elif schedule == "chunk":
+    split_x = chunk_scheduling_static(x_dim, chunk_size, rank, total_rank)
+else:
+    sys.exit(f"Unknown schedule '{schedule}', use 'block' or 'chunk'")
 
 
 
 '''
 First part of non Blocking: allocating buffer for each rank in rank 0
 '''
-if rank == 0:
-    bufs = [np.empty_like(image) for _ in range(1, total_rank)]  
-        # n buffer that are empty for each rank
+def post_irecvs(image, total_rank):
+    bufs = [np.empty_like(image) for _ in range(1, total_rank)]
     reqs = []
     for r in range(1, total_rank):
         reqs.append(comm.Irecv(bufs[r - 1], source=r, tag=r))
-        # open the connection so the process can send their results
+    return bufs, reqs
 
 
-
-
-
-
-
+bufs, reqs = [], []
+if comm_mode == "nonblocking" and rank == 0:
+    bufs, reqs = post_irecvs(image, total_rank)
 
 '''
 Real Computing
@@ -148,36 +169,36 @@ print(f"Rank {rank}: {t1 - t0:.2f} s for {len(split_x)} rows", flush=True)
 '''
 Blocking sending and recieving
 '''
-# if rank != 0:
-#     comm.Send(image, dest=0, tag=rank)
+def collect_blocking(image, rank, total_rank):
+    if rank != 0:
+        comm.Send(image, dest=0, tag=rank)
+    else:
+        buf = np.empty_like(image)
+        for r in range(1, total_rank):
+            comm.Recv(buf, source=r, tag=r)
+            image += buf
 
-# else:
-#     buf = np.empty_like(image)
-#     for x in range(1, total_rank):
-#         comm.Recv(buf, source=x, tag=x)
-#         image += buf
 
 
 '''
 Second part of non-blocking: Sending and Collecting buffers
 '''
-if rank != 0:
-    req = comm.Isend(image, dest=0, tag=rank)
-    req.Wait()
-
-else:
-    MPI.Request.Waitall(reqs)
-    for b in bufs:
+def collect_nonblocking(image, rank, bufs, reqs):
+    if rank != 0:
+        req = comm.Isend(image, dest=0, tag=rank)
+        req.Wait()
+    else:
+        MPI.Request.Waitall(reqs)
+        for b in bufs:
             image += b
 
 
 
 
-
-
-
-
-
+if comm_mode == "blocking":
+    collect_blocking(image, rank, total_rank)
+else:
+    collect_nonblocking(image, rank, bufs, reqs)
 
 
 if rank == 0:
