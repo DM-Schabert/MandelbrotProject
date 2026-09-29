@@ -64,9 +64,13 @@ xconst = np.diff(xlim)[0] / size[0]
 yconst = np.diff(ylim)[0] / size[1]
 
 
-## hier beginnt die aufgabe
 
-### erstmal die MPI basics:
+'''
+Task starts here now: 
+'''
+
+# MPI things:
+
 
 comm = MPI.COMM_WORLD
 # Get rank in the `comm` communicator.
@@ -75,17 +79,20 @@ rank = comm.Get_rank()
 total_rank = comm.Get_size()
 
 
-# ## hier kann man jetzt erstmal das bild, also die dim in x chunks unterteilen, je nachdem wie viele processe man hat und diese dann diese refionen an die prozesse übergeben
+
+# get shape of imaage
 x_dim, y_dim = np.shape(image)
 
-# ## und dass hier muss noch eimal gelooped werden damit ich am ende ein dict habe : [[1,2,3,4,5][6,7,8,9,10]]
+# split the array to the ranks: [[1,2,3,4,5][6,7,8,9,10]]
 splittet_x = np.array_split(np.arange(x_dim), total_rank)[rank]
 
-# nachdem man es da reingeschrieben hat kann man es aufteilen
 
 
 
 
+'''
+Running over the splittet x axis
+'''
 for x in range(size[splittet_x]):
 # now only over your part of the x and with communication
 
@@ -101,24 +108,27 @@ for x in range(size[splittet_x]):
                 break
 
 
-start = splittet_x[0]
-end = splittet_x[- 1] + 1
 
-if rank != 0:
-    comm.Send(image[start:end], dest=0, tag=rank)
 
-else:
-    for x in range(1, total_rank):
-        # hier muss wiedr etwas allokiert werden ein buffer damit man da rein schreiben kann
-        image = np.array(size)
-        werte = comm.Recv(image, rank, root=x)
+
+# start = splittet_x[0]
+# end = splittet_x[- 1] + 1
+
+# if rank != 0:
+#     comm.Send(image[start:end], dest=0, tag=rank)
+
+# else:
+#     for x in range(1, total_rank):
+#         # hier muss wiedr etwas allokiert werden ein buffer damit man da rein schreiben kann
+#         image = np.array(size)
+#         werte = comm.Recv(image, rank, root=x)
     
 
 
 
 
 
-## hier endet die aufgabe
+
 
 import matplotlib.pyplot as plt
 # Increase font-size
