@@ -14,7 +14,7 @@
 cd "${LS_SUBCWD:-.}"
 
 # ---- Environment (module versions live in env.sh) ----
-source env.sh
+source Env.sh
 source .venv/bin/activate
 unset PYTHONPATH
 
