@@ -80,12 +80,22 @@ total_rank = comm.Get_size()
 
 
 
-# get shape of imaage
+'''
+First Intuition of dividing the work
+'''
+# # get shape of imaage
+# x_dim, y_dim = np.shape(image)
+# # split the array to the ranks: [[1,2,3,4,5][6,7,8,9,10]]
+# split_x = np.array_split(np.arange(x_dim), total_rank)[rank]
+
+'''
+How the pdf says we should do it (way faster because computation heavy rows are in the middle of image)
+'''
 x_dim, y_dim = np.shape(image)
-
-# split the array to the ranks: [[1,2,3,4,5][6,7,8,9,10]]
-split_x = np.array_split(np.arange(x_dim), total_rank)[rank]
-
+rows = np.arange(x_dim)                          
+chunk_id = rows // chunk_size                    
+split_x = rows[chunk_id % total_rank == rank]
+# round robin thing
 
 
 '''
