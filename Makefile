@@ -24,7 +24,7 @@ help:
 	@echo "  make setup      Create .venv and install requirements (run once)"
 	@echo "  make test       Check that MPI + mpi4py work (NP processes)"
 	@echo "  make run        Run $(SCRIPT) directly, e.g. on a linuxsh node"
-	@echo "  make submit     Submit batch.sh to the queue with NP cores"
+	@echo "  make submit     Submit  Batch.sh to the queue with NP cores"
 	@echo "  make status     Show your queued/running jobs"
 	@echo "  make clean      Remove job output/error files"
 	@echo "  make distclean  Also remove the virtual environment"
@@ -53,7 +53,7 @@ run: setup
 	mpirun -n $(NP) python3 $(SCRIPT)
 
 submit: setup
-	bsub -n $(NP) < batch.sh
+	bsub -n $(NP) < Batch.sh
 
 status:
 	bstat
