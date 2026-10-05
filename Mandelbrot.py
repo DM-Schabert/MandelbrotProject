@@ -111,30 +111,37 @@ def chunk_scheduling_static(x_dim, chunk_size, rank, total_rank):
 
 
 
+
 x_dim, y_dim = np.shape(image)
-if schedule == "block":
-    split_x = block_scheduling_static(x_dim, rank, total_rank)
-elif schedule == "chunk":
-    split_x = chunk_scheduling_static(x_dim, chunk_size, rank, total_rank)
-else:
+if schedule not in ("block", "chunk"):
     sys.exit(f"Unknown schedule '{schedule}', use 'block' or 'chunk'")
 
 
+def rows_of(r):
+    if schedule == "block":
+        return block_scheduling_static(x_dim, r, total_rank)
+    return chunk_scheduling_static(x_dim, chunk_size, r, total_rank)
+
+
+split_x = rows_of(rank)
 
 '''
 First part of non Blocking: allocating buffer for each rank in rank 0
 '''
-def post_irecvs(image, total_rank):
-    bufs = [np.empty_like(image) for _ in range(1, total_rank)]
+def post_irecvs(total_rank):
+    bufs = [np.empty((len(rows_of(r)), y_dim)) for r in range(1, total_rank)]
     reqs = []
     for r in range(1, total_rank):
         reqs.append(comm.Irecv(bufs[r - 1], source=r, tag=r))
     return bufs, reqs
 
 
+comm.Barrier()
+t_start = MPI.Wtime()
+
 bufs, reqs = [], []
 if comm_mode == "nonblocking" and rank == 0:
-    bufs, reqs = post_irecvs(image, total_rank)
+    bufs, reqs = post_irecvs(total_rank)
 
 '''
 Real Computing
@@ -171,12 +178,13 @@ Blocking sending and recieving
 '''
 def collect_blocking(image, rank, total_rank):
     if rank != 0:
-        comm.Send(image, dest=0, tag=rank)
+        comm.Send(image[split_x], dest=0, tag=rank)
     else:
-        buf = np.empty_like(image)
         for r in range(1, total_rank):
+            rows_r = rows_of(r)
+            buf = np.empty((len(rows_r), y_dim))
             comm.Recv(buf, source=r, tag=r)
-            image += buf
+            image[rows_r] = buf
 
 
 
@@ -185,12 +193,13 @@ Second part of non-blocking: Sending and Collecting buffers
 '''
 def collect_nonblocking(image, rank, bufs, reqs):
     if rank != 0:
-        req = comm.Isend(image, dest=0, tag=rank)
+        my_rows = image[split_x]
+        req = comm.Isend(my_rows, dest=0, tag=rank)
         req.Wait()
     else:
         MPI.Request.Waitall(reqs)
-        for b in bufs:
-            image += b
+        for r in range(1, total_rank):
+            image[rows_of(r)] = bufs[r - 1]
 
 
 
@@ -200,8 +209,16 @@ if comm_mode == "blocking":
 else:
     collect_nonblocking(image, rank, bufs, reqs)
 
+t_end = MPI.Wtime()
+
+
+compute_times = comm.gather(t1 - t0, root=0)
 
 if rank == 0:
+    ct = np.array(compute_times)
+    print(f"RESULT,{total_rank},{schedule},{comm_mode},{chunk_size},"
+          f"{size[0]}x{size[1]},{t_end - t_start:.4f},"
+          f"{ct.max():.4f},{ct.mean():.4f},{ct.max() / ct.mean():.3f}", flush=True)
     import matplotlib.pyplot as plt
     # Increase font-size
     plt.rcParams.update({
