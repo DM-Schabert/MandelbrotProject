@@ -167,6 +167,8 @@ def compute_piece(image, piece, infos):
                 if np.abs(z) > 2:
                     image[x, y] = i
                     break
+            else:
+                image[x, y] = infos.max_iter
 
 
 # ============================================================
@@ -256,8 +258,12 @@ def collect_nonblocking_perchunk(comm, image, rank, bufs, reqs, where, send_reqs
 # One full run
 # ============================================================
 
-def run(comm, infos):
+def run(comm, infos, compute=compute_piece):
     """Compute and collect the image. All ranks must call this.
+
+    `compute(image, piece, infos)` fills the rows `piece` of `image`. It is
+    compute_piece by default; tests swap in a fast function to check the
+    communication without the slow calculation.
 
     Returns (image, timings). The image is only complete on rank 0.
     `timings` has t_total, t_wait (rank 0's time after computing until all
@@ -280,7 +286,7 @@ def run(comm, infos):
     t_compute = 0.0  # pure computing time, without time spent in Send
     for k, piece in enumerate(infos.pieces_of(my_rows)):
         tp = MPI.Wtime()
-        compute_piece(image, piece, infos)
+        compute(image, piece, infos)
         t_compute += MPI.Wtime() - tp
 
         # per-chunk modes: workers ship every piece as soon as it is computed
@@ -335,9 +341,9 @@ def make_figure(image, infos):
     with matplotlib.rc_context({"font.size": 10}):
         fig = Figure()
         ax = fig.add_subplot()
-        ax.imshow(image.T, extent=np.concatenate([infos.xlim, infos.ylim]))
-        ax.set_xlabel(r"x / Re(p_0)")
-        ax.set_ylabel(r"y / Im(p_0)")
+        ax.imshow(image.T, extent=np.concatenate([infos.xlim, infos.ylim]), origin="lower")
+        ax.set_xlabel(r"$x$ / Re($p_0$)")
+        ax.set_ylabel(r"$y$ / Im($p_0$)")
         ax.margins(0, 0)
     return fig
 
