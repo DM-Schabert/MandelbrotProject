@@ -29,17 +29,23 @@ RANKS="1 2 4 8 16"
 MODES="blocking nonblocking blocking_perchunk nonblocking_perchunk"
 ARGS="10 5000x5000 -2.2:0.75 -1.3:1.3 chunk"   # chunk-size size xlim ylim schedule
 OUT="results_cluster_${LSB_JOBID:-local}.csv"
+PROGRESS="progress_${LSB_JOBID:-local}.txt"   # one line per started run, follow with `tail -f`
+TOTAL=$(( REPS * $(echo $RANKS | wc -w) * $(echo $MODES | wc -w) ))
+i=0
 
 # Record where the job ran, needed to describe the hardware in the report
 echo "Host:      $(hostname)"
 echo "CPU model: $(lscpu | grep 'Model name' | sed 's/.*: *//')"
 echo "LSF hosts: $LSB_HOSTS"
 echo "Results:   $OUT"
+echo "Progress:  $PROGRESS"
 
 # ---- Run: rep, then ranks, then modes (modes interleaved so drift hits all equally) ----
 for rep in $(seq 1 $REPS); do
   for n in $RANKS; do
     for cm in $MODES; do
+      i=$((i + 1))
+      echo "$(date +%H:%M:%S)  run $i/$TOTAL  rep=$rep n=$n mode=$cm" >> "$PROGRESS"
       out=$(mpirun -n $n python3 Mandelbrot.py $ARGS $cm 2>&1)
       line=$(echo "$out" | grep RESULT)
       if [ -z "$line" ]; then
