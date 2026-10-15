@@ -2,7 +2,8 @@
 # ---- LSF job options (DTU HPC) ----
 # Benchmark of all four communication modes, everything on ONE node so that
 # every run sees the same hardware.
-# Submit from the project folder with:   bsub < bench_rep.sh
+# Submit from the project folder with:   bsub < DavidsExperiment/bench_rep.sh
+# (submitting from inside DavidsExperiment/ works too)
 #BSUB -J mandelbrot_bench        # job name
 #BSUB -q hpcintro                # course queue
 #BSUB -n 16                      # reserve 16 cores, runs use 1..16 of them
@@ -14,8 +15,11 @@
 # Optional: pin a CPU model so repeated jobs are comparable (pick one from `nodestat`)
 ##BSUB -R "select[model == <CPU model>]"
 
-# Run from the folder the job was submitted from
+# Run from the project root, also when submitted from inside DavidsExperiment/
 cd "${LS_SUBCWD:-.}"
+if [ ! -f Env.sh ] && [ -f ../Env.sh ]; then cd ..; fi
+OUTDIR=DavidsExperiment/results
+mkdir -p "$OUTDIR"
 
 # ---- Environment (module versions live in Env.sh) ----
 source Env.sh
@@ -28,8 +32,8 @@ REPS=3
 RANKS="1 2 4 8 16"
 MODES="blocking nonblocking blocking_perchunk nonblocking_perchunk"
 ARGS="10 5000x5000 -2.2:0.75 -1.3:1.3 chunk"   # chunk-size size xlim ylim schedule
-OUT="results_cluster_${LSB_JOBID:-local}.csv"
-PROGRESS="progress_${LSB_JOBID:-local}.txt"   # one line per started run, follow with `tail -f`
+OUT="$OUTDIR/results_cluster_${LSB_JOBID:-local}.csv"
+PROGRESS="$OUTDIR/progress_${LSB_JOBID:-local}.txt"   # one line per started run, follow with `tail -f`
 TOTAL=$(( REPS * $(echo $RANKS | wc -w) * $(echo $MODES | wc -w) ))
 i=0
 
