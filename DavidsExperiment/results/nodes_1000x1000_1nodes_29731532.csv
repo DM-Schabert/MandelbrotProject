@@ -1,0 +1,7 @@
+repeat,ranks,schedule,comm_mode,chunk_size,size,t_total,compute_max,compute_mean,imbalance,t_wait
+1,16,chunk,blocking,10,1000x1000,2.9741,2.9641,2.5945,1.142,0.7601
+1,16,chunk,nonblocking,10,1000x1000,3.0319,3.0256,2.6102,1.159,0.7771
+2,16,chunk,blocking,10,1000x1000,3.0656,3.0557,2.6308,1.161,0.5349
+2,16,chunk,nonblocking,10,1000x1000,3.0708,3.0645,2.6011,1.178,0.7070
+3,16,chunk,blocking,10,1000x1000,2.9587,2.9496,2.5726,1.147,0.5521
+3,16,chunk,nonblocking,10,1000x1000,2.8652,2.8593,2.5665,1.114,0.5701

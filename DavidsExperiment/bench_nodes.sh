@@ -1,11 +1,5 @@
 #!/bin/bash
-# ---- LSF job: image-size sweep at a fixed number of ranks (16) ----
-# 1 node vs. multiple nodes: submit the SAME script once per placement,
-# the placement is given on the command line:
-#   bsub -R "rusage[mem=3GB] span[ptile=16]" < DavidsExperiment/bench_nodes.sh   # 1 node  x 16 ranks
-#   bsub -R "rusage[mem=3GB] span[ptile=8]"  < DavidsExperiment/bench_nodes.sh   # 2 nodes x  8 ranks
-#   bsub -R "rusage[mem=3GB] span[ptile=4]"  < DavidsExperiment/bench_nodes.sh   # 4 nodes x  4 ranks
-# (from the project root; submitting from inside DavidsExperiment/ works too)
+
 #BSUB -J mandel_nodes             # job name
 #BSUB -q hpcintro                 # course queue
 #BSUB -n 16                       # 16 ranks in every placement

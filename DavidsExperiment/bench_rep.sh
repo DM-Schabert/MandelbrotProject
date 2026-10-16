@@ -1,9 +1,5 @@
 #!/bin/bash
-# ---- LSF job options (DTU HPC) ----
-# Benchmark of all four communication modes, everything on ONE node so that
-# every run sees the same hardware.
-# Submit from the project folder with:   bsub < DavidsExperiment/bench_rep.sh
-# (submitting from inside DavidsExperiment/ works too)
+
 #BSUB -J mandelbrot_bench        # job name
 #BSUB -q hpcintro                # course queue
 #BSUB -n 16                      # reserve 16 cores, runs use 1..16 of them
